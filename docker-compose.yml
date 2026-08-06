@@ -23,10 +23,17 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: ${DATABASE_URL}
+      # Only ./backend is bind-mounted to /app, so config.py's own
+      # two-levels-up default would resolve outside the container's
+      # filesystem entirely. Point it at a path we mount explicitly below,
+      # so the file lands at ./logs/application.log on the host regardless
+      # of whether the app runs in Docker or bare `uvicorn`.
+      LOG_FILE_PATH: /var/log/log-aggregator/application.log
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      - ./logs:/var/log/log-aggregator
     depends_on:
       postgres:
         condition: service_healthy

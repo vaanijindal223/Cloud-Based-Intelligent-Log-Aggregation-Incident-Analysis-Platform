@@ -1,2 +1,3 @@
-# Pydantic request/response schemas are added starting Phase 3
-# (log ingestion), once we have real payloads to validate.
+from app.schemas.log import LogEventIn, LogRecordOut
+
+__all__ = ["LogEventIn", "LogRecordOut"]

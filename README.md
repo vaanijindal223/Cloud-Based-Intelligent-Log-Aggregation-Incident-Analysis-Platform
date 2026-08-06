@@ -23,7 +23,7 @@ Built incrementally, one module/phase at a time. See progress below.
 backend/                FastAPI app (API, models, services, database)
   app/simulation/          Scenario-based demo log generator     (Phase 2)
 frontend/                React + Vite + Tailwind dashboard
-collector/                CloudWatch log collector            (Phase 3)
+collector/                CloudWatch → PostgreSQL normalizer   (Phase 3B)
 correlation_engine/       Groups logs into incidents           (Phase 4)
 incident_builder/          Persists incidents                    (Phase 4)
 timeline_engine/           Builds incident timelines              (Phase 5)
@@ -32,6 +32,8 @@ llm_engine/                 Explainable AI (LangChain)              (Phase 8)
 alert_service/               Smart SNS alerting                       (Phase 9)
 docker/                       Shared infra config
 docs/                          Design/reference docs
+  data_contract.md              Canonical log shape across every module
+  aws/                            Phase 3A CloudWatch Agent config, IAM policy, runbook
 scripts/                        Helper/automation scripts
 tests/                            Test suites
 docker-compose.yml
@@ -40,7 +42,8 @@ docker-compose.yml
 ## Phase progress
 - [x] **Phase 1 — Project Setup**: FastAPI backend, React frontend, PostgreSQL, Docker Compose, all wired together
 - [x] **Phase 2 — Log Generation**: scenario-based simulation engine (ecommerce workflow + 6 injectable failures), real-time paced background execution, REST control API
-- [ ] Phase 3 — Cloud Log Collection
+- [x] **Phase 3A — Cloud Log Collection**: CloudWatch Agent config/IAM policy/runbook prepared (`docs/aws/`) — apply on your own AWS account, not run from this repo's dev environment
+- [x] **Phase 3B — CloudWatch Log Collector**: polls CloudWatch Logs, normalizes into the [data contract](docs/data_contract.md), dedups via `source_event_id`, writes to PostgreSQL with `processed = false`
 - [ ] Phase 4 — Incident Correlation Engine
 - [ ] Phase 5 — Incident Timeline
 - [ ] Phase 6 — Dashboard
@@ -138,3 +141,24 @@ curl -X POST http://localhost:8000/api/simulation/start \
 
 curl http://localhost:8000/api/simulation/status
 ```
+
+## Phase 3 — Cloud Log Collection
+
+Split into two independent pieces so a broken CloudWatch integration can never take down
+log ingestion into PostgreSQL, and vice versa. Read [`docs/data_contract.md`](docs/data_contract.md)
+first — it's the schema every module below and every future phase (correlation, timeline,
+knowledge base, LLM) reads and writes.
+
+**Phase 3A — CloudWatch Agent** (`docs/aws/`): ship `logs/application.log` into CloudWatch
+Logs. No collector, no database writes — just confirm structured logs are visibly landing in
+CloudWatch. Requires an AWS account; follow `docs/aws/cloudwatch_agent_setup.md`.
+
+**Phase 3B — Collector** (`collector/`): an independent process that polls CloudWatch Logs,
+normalizes each event into the Stored Log Record shape, deduplicates by CloudWatch's
+`eventId`, and writes to the `logs` table with `processed = false`. See `collector/README.md`.
+
+> **Note:** the `logs` table gained new columns (`incident_id`, `workflow`, `failure_type`,
+> `source`, `source_event_id`, `processed`) in this phase. There's no Alembic yet
+> (tables are created via `create_all()`, which won't alter an existing table) — if you
+> already have a local Postgres volume from Phase 1/2, reset it: `docker compose down -v`
+> then `docker compose up --build`.
