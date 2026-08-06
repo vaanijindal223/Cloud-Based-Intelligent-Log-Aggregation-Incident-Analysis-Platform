@@ -1,11 +1,15 @@
 # Environment
 .env
+.claude
 
 # Python
 __pycache__/
 *.pyc
 .venv/
 .pytest_cache/
+
+# Demo log output (Phase 2 simulation writes here; CloudWatch Agent tails it in Phase 3)
+logs/
 
 # Node
 node_modules/

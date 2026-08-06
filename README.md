@@ -21,6 +21,7 @@ Built incrementally, one module/phase at a time. See progress below.
 ## Project structure
 ```
 backend/                FastAPI app (API, models, services, database)
+  app/simulation/          Scenario-based demo log generator     (Phase 2)
 frontend/                React + Vite + Tailwind dashboard
 collector/                CloudWatch log collector            (Phase 3)
 correlation_engine/       Groups logs into incidents           (Phase 4)
@@ -38,7 +39,7 @@ docker-compose.yml
 
 ## Phase progress
 - [x] **Phase 1 — Project Setup**: FastAPI backend, React frontend, PostgreSQL, Docker Compose, all wired together
-- [ ] Phase 2 — Log Generation
+- [x] **Phase 2 — Log Generation**: scenario-based simulation engine (ecommerce workflow + 6 injectable failures), real-time paced background execution, REST control API
 - [ ] Phase 3 — Cloud Log Collection
 - [ ] Phase 4 — Incident Correlation Engine
 - [ ] Phase 5 — Incident Timeline
@@ -101,3 +102,39 @@ pytest ../tests/backend -v
 
 ### Future improvements
 Alembic migrations (replacing `create_all()`), multi-stage production Docker builds, reverse proxy/HTTPS termination.
+
+## Phase 2 — Log Generation
+
+A demo log generator simulates realistic incidents instead of random noise, so the (future)
+correlation engine has logically-connected events to group. It writes newline-delimited JSON
+to `logs/application.log` — the exact file a CloudWatch Agent will tail unchanged in Phase 3.
+Nothing in this phase talks to AWS.
+
+### Concepts
+- **Workflow** (`backend/app/simulation/workflows/`): a baseline business flow. Currently just
+  `ecommerce` (login → browse → cart → checkout).
+- **Failure** (`backend/app/simulation/failures/`): an injectable tail appended after the
+  workflow completes — `database_timeout`, `redis_failure`, `payment_api_timeout`,
+  `auth_failure`, `cpu_spike`, `disk_full`, or `none` for a healthy run.
+- Every run shares one `trace_id` across all its logs; runs with a failure also get an
+  `incident_id`, so Phase 4's correlation engine can group by either.
+- Simulations run as a background asyncio task and write one log line at a time, paced in
+  real time (`speed: instant | fast | normal`), so `/api/simulation/status` and
+  `/api/simulation/stop` reflect an actually-running simulation instead of a completed no-op.
+
+### API
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/simulation/workflows` | List available workflows |
+| GET | `/api/simulation/failures` | List available failures (incl. `none`) |
+| POST | `/api/simulation/start` | Body: `{"workflow": "ecommerce", "failure": "database_timeout", "speed": "fast"}` |
+| POST | `/api/simulation/stop` | Cancel the running simulation |
+| GET | `/api/simulation/status` | Current simulation state, trace/incident id, last log emitted |
+
+```bash
+curl -X POST http://localhost:8000/api/simulation/start \
+  -H "Content-Type: application/json" \
+  -d '{"workflow": "ecommerce", "failure": "database_timeout", "speed": "fast"}'
+
+curl http://localhost:8000/api/simulation/status
+```
