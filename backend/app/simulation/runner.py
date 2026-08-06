@@ -35,7 +35,7 @@ async def run_simulation(state: "SimulationState", steps: list[LogStep], speed: 
                 "trace_id": state.trace_id,
                 "incident_id": state.incident_id,
                 "workflow": state.workflow_name,
-                "failure": state.failure_name,
+                "failure_type": None if state.failure_name == "none" else state.failure_name,
             }
             write_log_entry(entry)
             state.record_emitted(entry)

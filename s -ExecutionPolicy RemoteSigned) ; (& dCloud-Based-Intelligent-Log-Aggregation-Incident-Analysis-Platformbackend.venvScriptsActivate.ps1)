@@ -1,0 +1,21 @@
+[33mcommit 4c42a63df799e77e11ce6e4934bd4ded1f99a89e[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mshagun[m[33m, [m[1;31morigin/shagun[m[33m)[m
+Author: shagunkimothi <shagun2004k@gmail.com>
+Commit: shagunkimothi <shagun2004k@gmail.com>
+
+    phase 2
+
+[33mcommit 930b617b04c7936032549f7adb7942326183210b[m
+Author: shagunkimothi <shagun2004k@gmail.com>
+Commit: shagunkimothi <shagun2004k@gmail.com>
+
+    Add Phase 1 project scaffold: FastAPI backend, React frontend, Docker Compose
+    
+    Sets up the initial structure for the log aggregation platform - backend API with health check and SQLAlchemy models, React/Vite/Tailwind frontend, Postgres via Docker Compose, and placeholder module directories for upcoming phases.
+    
+    Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+
+[33mcommit 03060569eaa547d04d2d653989502f48d46f2bf7[m[33m ([m[1;32mmain[m[33m)[m
+Author: vaanijindal223 <146702193+vaanijindal223@users.noreply.github.com>
+Commit: GitHub <noreply@github.com>
+
+    Initial commit
