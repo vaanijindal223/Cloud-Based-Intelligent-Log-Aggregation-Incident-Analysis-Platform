@@ -42,6 +42,12 @@ exactly what the agent can and can't touch.
 
 ## 3. Install the agent
 
+**EC2 (Ubuntu):** the agent ships as a `.deb`, not a yum package:
+```bash
+wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
+sudo dpkg -i -E ./amazon-cloudwatch-agent.deb
+```
+
 **EC2 (Amazon Linux 2023):**
 ```bash
 sudo yum install -y amazon-cloudwatch-agent
@@ -54,7 +60,10 @@ the [CloudWatch Agent downloads page](https://docs.aws.amazon.com/AmazonCloudWat
 
 Copy `docs/aws/cloudwatch-agent-config.json`, and edit `file_path` to match where
 `application.log` actually lands:
-- EC2: wherever you deploy the repo, e.g. `/home/ec2-user/log-aggregator/logs/application.log`
+- EC2 (Ubuntu, this project's deployment target): wherever the repo is cloned under the
+  `ubuntu` user's home, e.g.
+  `/home/ubuntu/Cloud-Based-Intelligent-Log-Aggregation-Incident-Analysis-Platform/logs/application.log`
+- EC2 (Amazon Linux): e.g. `/home/ec2-user/log-aggregator/logs/application.log`
 - Local Windows dev: the repo's `logs\application.log`, e.g.
   `D:\Cloud-Based-Intelligent-Log-Aggregation-Incident-Analysis-Platform\logs\application.log`
 
@@ -81,6 +90,14 @@ curl -X POST http://localhost:8000/api/simulation/start \
 Then in the AWS Console: CloudWatch → Log groups → `/log-aggregator/application` → the
 newest log stream. You should see the same JSON lines that land in `logs/application.log`,
 arriving within a few seconds (the agent's default flush interval).
+
+**Don't trust `DescribeLogStreams`'s `lastIngestionTime` for real-time verification** — it's
+known to lag well behind actual delivery (observed several minutes stale even after fresh
+events landed). To confirm delivery immediately after a config change, either check the
+stream contents directly in the Console/`GetLogEvents`, or temporarily set `"debug": true`
+under `agent` in the config and re-fetch — the agent then logs a line like `[outputs.cloudwatchlogs]
+Pusher published N log events to group: ... in 38ms` on every successful flush. Revert the
+debug flag (re-fetch the plain config) once confirmed; it's noisy for normal operation.
 
 **Stop here.** Don't write collector code yet — confirm live streaming works first, since
 if this step is broken, Phase 3B has nothing to read.
