@@ -1,50 +1,16 @@
-import { useEffect, useState } from "react";
-
+import {useEffect, useState} from "react";
 import api from "./services/api";
-
-function App() {
-  const [health, setHealth] = useState(null);
-  const [error, setError] = useState(false);
-
-  useEffect(() => {
-    api
-      .get("/api/health")
-      .then((res) => setHealth(res.data))
-      .catch(() => setError(true));
-  }, []);
-
-  const connected = health?.status === "ok";
-
-  return (
-    <div className="min-h-screen bg-slate-100 flex items-center justify-center">
-      <div className="bg-white shadow-md rounded-lg p-8 w-full max-w-md text-center">
-        <h1 className="text-xl font-semibold text-slate-800 mb-4">
-          Cloud-Based Log Aggregation & Alerting System
-        </h1>
-
-        <div className="flex items-center justify-center gap-2 mb-2">
-          <span
-            className={`h-3 w-3 rounded-full ${
-              connected ? "bg-green-500" : error ? "bg-red-500" : "bg-yellow-400"
-            }`}
-          />
-          <span className="text-slate-600">
-            {connected
-              ? "Backend Connected"
-              : error
-                ? "Backend Unreachable"
-                : "Checking backend..."}
-          </span>
-        </div>
-
-        {health && (
-          <p className="text-sm text-slate-400">
-            Database: {health.database}
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-export default App;
+const Badge=({value})=><span className={`badge ${String(value).toLowerCase()}`}>{value}</span>;
+export default function App(){
+ const [summary,setSummary]=useState(null),[incidents,setIncidents]=useState([]),[simulation,setSimulation]=useState(null),[page,setPage]=useState("Overview"),[failure,setFailure]=useState("database_timeout"),[message,setMessage]=useState("");
+ const load=async()=>{try{let [a,b,c]=await Promise.all([api.get('/api/dashboard/summary'),api.get('/api/incidents'),api.get('/api/simulation/status')]);setSummary(a.data);setIncidents(b.data);setSimulation(c.data)}catch{setMessage('Backend unavailable — start Docker Compose or the FastAPI server.')}};
+ useEffect(()=>{load();let x=setInterval(load,8000);return()=>clearInterval(x)},[]);
+ const start=async()=>{try{await api.post('/api/simulation/start',{workflow:'ecommerce',failure,speed:'fast'});setMessage('Simulation started. CloudWatch collection remains optional; run correlation after logs are collected.');load()}catch(e){setMessage(e.response?.data?.detail||'Unable to start simulation')}};
+ const correlate=async()=>{try{let r=await api.post('/api/incidents/correlate');setMessage(`${r.data.created.length} incident(s) correlated.`);load()}catch{setMessage('Correlation failed')}};
+ return <main><header><div><b>SignalWatch</b><small>Cloud incident intelligence</small></div><nav>{['Overview','Incidents','Simulation','Knowledge Base'].map(x=><button className={page===x?'selected':''} onClick={()=>setPage(x)}>{x}</button>)}</nav></header>{message&&<p className="notice">{message}</p>}
+ {page==='Overview'&&<><section className="hero"><div><h1>Operational clarity, not raw noise.</h1><p>Correlate structured logs into incidents, timelines and reusable engineering knowledge.</p></div><button onClick={correlate}>Run correlation</button></section><section className="cards">{[['Total incidents',summary?.total_incidents],['Active',summary?.active_incidents],['Critical',summary?.severity?.CRITICAL],['Resolved',summary?.resolved_incidents]].map(([l,n])=><article><small>{l}</small><strong>{n??'—'}</strong></article>)}</section><h2>Recent incidents</h2><IncidentTable rows={summary?.recent_incidents||[]}/></>}
+ {page==='Incidents'&&<><div className="row"><h1>Incidents</h1><button onClick={correlate}>Correlate unprocessed logs</button></div><IncidentTable rows={incidents}/></>}
+ {page==='Simulation'&&<section className="panel"><h1>Simulation control</h1><p>Generate a paced e-commerce workflow with deterministic failure signals.</p><label>Failure scenario<select value={failure} onChange={e=>setFailure(e.target.value)}>{['database_timeout','redis_failure','payment_api_timeout','auth_failure','cpu_spike','disk_full','none'].map(x=><option value={x}>{x.replaceAll('_',' ')}</option>)}</select></label><p>Status: <Badge value={simulation?.status||'unknown'}/></p><button onClick={start}>Start fast simulation</button><button className="secondary" onClick={()=>api.post('/api/simulation/stop').then(load)}>Stop</button></section>}
+ {page==='Knowledge Base'&&<Knowledge/>}</main>}
+function IncidentTable({rows}){return <div className="table"><div className="thead"><span>ID</span><span>Severity</span><span>Status</span><span>Summary</span><span>Services</span></div>{rows.length?rows.map(x=><div className="trow"><span>INC-{x.incident_id}</span><span><Badge value={x.severity}/></span><span><Badge value={x.status}/></span><span>{x.summary}</span><span>{(x.affected_services||[]).join(', ')}</span></div>):<p className="empty">No incidents yet. Run a simulation, collect logs, then correlate.</p>}</div>}
+function Knowledge(){const [rows,setRows]=useState([]);useEffect(()=>{api.get('/api/knowledge-base').then(x=>setRows(x.data)).catch(()=>{})},[]);return <><h1>Knowledge base</h1><p>Verified resolutions from resolved incidents.</p>{rows.map(x=><article className="panel"><b>INC-{x.incident_id}</b><p>{x.root_cause}</p><small>{x.resolution}</small></article>)||<p>Nothing resolved yet.</p>}</>}

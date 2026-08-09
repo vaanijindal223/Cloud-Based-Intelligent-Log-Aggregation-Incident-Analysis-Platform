@@ -12,3 +12,5 @@ class Feedback(Base):
     )
     ai_correct: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     engineer_comments: Mapped[str | None] = mapped_column(Text, nullable=True)
+    actual_root_cause: Mapped[str | None] = mapped_column(Text, nullable=True)
+    actual_resolution: Mapped[str | None] = mapped_column(Text, nullable=True)

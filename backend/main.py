@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import health, simulation
+from app.api import health, simulation, incidents, dashboard, knowledge_base
 from app.config import settings
 from app.database.session import Base, engine
 from app.models import Feedback, Incident, IncidentTimeline, KnowledgeBase, Log  # noqa: F401
@@ -32,6 +32,9 @@ app.add_middleware(
 
 app.include_router(health.router, prefix="/api", tags=["health"])
 app.include_router(simulation.router, prefix="/api", tags=["simulation"])
+app.include_router(incidents.router, prefix="/api", tags=["incidents"])
+app.include_router(dashboard.router, prefix="/api", tags=["dashboard"])
+app.include_router(knowledge_base.router, prefix="/api", tags=["knowledge base"])
 
 
 @app.get("/")
