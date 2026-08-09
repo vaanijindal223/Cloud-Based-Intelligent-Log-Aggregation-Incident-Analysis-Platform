@@ -13,9 +13,9 @@ Built incrementally, one module/phase at a time. See progress below.
 - **Frontend:** React, Tailwind CSS, Axios, Recharts
 - **Backend:** FastAPI (Python)
 - **Database:** PostgreSQL
-- **Queue:** Apache Kafka (Docker)
+- **Processing:** deterministic in-process correlation (no queue required)
 - **Cloud:** AWS EC2, CloudWatch Logs, SNS, IAM, S3 (optional)
-- **AI:** LangChain + OpenAI/Gemini API
+- **AI:** optional OpenAI-ready provider configuration; deterministic fallback remains available
 - **Containers:** Docker, Docker Compose
 
 ## Project structure

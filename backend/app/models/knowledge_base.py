@@ -1,4 +1,5 @@
-from sqlalchemy import ForeignKey, Integer, Text
+from sqlalchemy import DateTime, ForeignKey, Integer, Text
+from datetime import datetime, timezone
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database.session import Base
@@ -14,3 +15,5 @@ class KnowledgeBase(Base):
     root_cause: Mapped[str] = mapped_column(Text)
     resolution: Mapped[str] = mapped_column(Text)
     engineer_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

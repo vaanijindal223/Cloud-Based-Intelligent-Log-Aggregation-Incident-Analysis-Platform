@@ -4,15 +4,15 @@ services:
     container_name: log_platform_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:-loguser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-logpass123}
+      POSTGRES_DB: ${POSTGRES_DB:-logaggregator}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-loguser} -d ${POSTGRES_DB:-logaggregator}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -22,7 +22,13 @@ services:
     container_name: log_platform_backend
     restart: unless-stopped
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://loguser:logpass123@postgres:5432/logaggregator}
+      CORRELATION_WINDOW_SECONDS: ${CORRELATION_WINDOW_SECONDS:-300}
+      MAX_INCIDENT_GAP_SECONDS: ${MAX_INCIDENT_GAP_SECONDS:-900}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      AWS_REGION: ${AWS_REGION:-ap-south-1}
+      SNS_TOPIC_ARN: ${SNS_TOPIC_ARN:-}
       # Only ./backend is bind-mounted to /app, so config.py's own
       # two-levels-up default would resolve outside the container's
       # filesystem entirely. Point it at a path we mount explicitly below,
