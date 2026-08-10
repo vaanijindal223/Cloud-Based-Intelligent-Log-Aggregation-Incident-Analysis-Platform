@@ -147,6 +147,15 @@ resources:
 8. Add engineer feedback, then resolve the incident. The final resolution is
    stored in the knowledge base for later similarity retrieval.
 
+### Engineer feedback storage
+
+The feedback form saves its data in the PostgreSQL `feedback` table against the
+incident ID. At present, the dashboard does not reload or display a previously
+saved feedback form after it is submitted. When an incident is resolved, the
+engineer's actual root cause, actual resolution, and comments are copied into
+the related knowledge-base record. The current Knowledge Base screen displays
+the root cause and resolution, but not the engineer comments.
+
 Available injected failures:
 
 - `database_timeout`
@@ -178,6 +187,40 @@ have working defaults in `.env.example`.
 
 Without a key, incident collection, correlation, timelines, feedback, and the
 knowledge base still work. The API reports that AI analysis is unavailable.
+
+## AWS integration evidence (optional)
+
+AWS is not required for the localhost demo. The following screenshots document
+the optional CloudWatch and SNS setup used to validate the cloud integration.
+Setup reference files are in `docs/aws/`.
+
+### IAM role policies
+
+The collector role has the policies required to read CloudWatch logs and send
+notifications through SNS.
+
+![IAM role policies](docs/screenshots/image13.png)
+
+### CloudWatch log group
+
+The application log group receives structured application logs before the
+collector normalizes them into PostgreSQL records.
+
+![CloudWatch log group](docs/screenshots/image17.png)
+
+### CloudWatch log events
+
+The events shown below are structured JSON application logs available to the
+CloudWatch collector.
+
+![CloudWatch log events](docs/screenshots/image19.png)
+
+### SNS subscription
+
+The SNS topic has a confirmed email subscription for consolidated incident
+notifications.
+
+![SNS subscription](docs/screenshots/image15.png)
 
 ## API overview
 
