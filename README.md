@@ -1,183 +1,318 @@
-# Cloud-Based Log Aggregation & Alerting System
+# Cloud-Based Intelligent Log Aggregation & Incident Analysis Platform
 
-## Final architecture and demo
+An incident-intelligence platform that turns structured application logs into
+correlated incidents, timelines, optional AI analysis, alerts, and reusable
+engineering knowledge. It is designed to sit on top of a log source; it is not
+a replacement for CloudWatch, ELK, or Splunk.
 
-This project is an incident-intelligence layer, not a replacement for CloudWatch. In local
-development the path is `Simulation -> application.log -> Local Collector -> PostgreSQL ->
-Correlation`. In AWS it is `EC2 application -> CloudWatch Agent -> CloudWatch Logs ->
-CloudWatch Collector -> PostgreSQL -> Correlation`. Both then continue through `Incident ->
-Timeline -> Historical Retrieval -> Explainable LLM -> SNS`.
+The full application can be run locally with Docker. A new user does **not**
+need to install Python, Node.js, PostgreSQL, or AWS tools for the local demo.
+Docker starts the backend, frontend, collector, and database in containers.
 
-Required local variables are `DATABASE_URL`, `LOG_SOURCE=local`, and collector file settings.
-`GEMINI_API_KEY` is optional unless live AI analysis is being tested; `SNS_TOPIC_ARN` and AWS
-default credentials are optional unless live incident alerts are being tested. Set
-`LOG_SOURCE=cloudwatch`, `AWS_REGION`, and `LOG_GROUP_NAME` for the EC2/CloudWatch demo.
+## What it does
 
-For a local demo, run `docker compose up --build`, start a `database_timeout` simulation, wait
-for collection, run correlation, open the incident, request AI analysis (when configured), then
-save feedback and resolve it. AWS validation additionally requires an EC2 instance, CloudWatch
-Agent configuration from `docs/aws/`, a collector identity with CloudWatch read access, and an
-SNS topic/publish permission.
+- Generates realistic ecommerce workflow logs with optional injected failures.
+- Collects logs from a local file for the demo, or from AWS CloudWatch Logs.
+- Validates, normalizes, and deduplicates every collected log before storage.
+- Correlates related warning/error logs into incidents and assigns severity.
+- Creates a chronological incident timeline and exposes it on the dashboard.
+- Stores resolved incidents and engineer feedback as searchable historical knowledge.
+- Optionally requests evidence-based Gemini analysis and sends consolidated SNS alerts.
 
-An intelligent monitoring platform that sits on top of cloud log aggregation and turns thousands of raw logs into a handful of meaningful, explained incidents — instead of another CloudWatch/ELK/Splunk clone.
+## Local architecture
 
-```
-Logs → Aggregation → Incident Correlation → Incident Timeline →
-Historical Retrieval → Explainable AI → Smart Alerts → Engineer Feedback → Knowledge Base
-```
+For the default local demo, every component runs on the same computer through
+Docker Compose:
 
-Built incrementally, one module/phase at a time. See progress below.
+```text
+Browser (http://localhost:5173)
+        |
+        v
+React frontend  ----->  FastAPI backend (http://localhost:8000)
+                              |
+                              v
+                         PostgreSQL database
 
-## Tech stack
-- **Frontend:** React, Tailwind CSS, Axios, Recharts
-- **Backend:** FastAPI (Python)
-- **Database:** PostgreSQL
-- **Processing:** deterministic in-process correlation (no queue required)
-- **Cloud:** AWS EC2, CloudWatch Logs, SNS, IAM, S3 (optional)
-- **AI:** optional Gemini API integration with deterministic fallback when no key is configured
-- **Containers:** Docker, Docker Compose
-
-## Project structure
-```
-backend/                FastAPI app (API, models, services, database)
-  app/simulation/          Scenario-based demo log generator     (Phase 2)
-frontend/                React + Vite + Tailwind dashboard
-collector/                CloudWatch → PostgreSQL normalizer   (Phase 3B)
-correlation_engine/       Groups logs into incidents           (Phase 4)
-incident_builder/          Persists incidents                    (Phase 4)
-timeline_engine/           Builds incident timelines              (Phase 5)
-knowledge_base/            Historical incident storage/retrieval  (Phase 7)
-llm_engine/                 Explainable Gemini AI                   (Phase 8)
-alert_service/               Smart SNS alerting                       (Phase 9)
-docker/                       Shared infra config
-docs/                          Design/reference docs
-  data_contract.md              Canonical log shape across every module
-  aws/                            Phase 3A CloudWatch Agent config, IAM policy, runbook
-scripts/                        Helper/automation scripts
-tests/                            Test suites
-docker-compose.yml
+Simulation -> logs/application.log -> Collector -> PostgreSQL -> Correlation
+                                                          |
+                                                          v
+                                                Incidents and timelines
 ```
 
-## Phase progress
-- [x] **Phase 1 — Project Setup**: FastAPI backend, React frontend, PostgreSQL, Docker Compose, all wired together
-- [x] **Phase 2 — Log Generation**: scenario-based simulation engine (ecommerce workflow + 6 injectable failures), real-time paced background execution, REST control API
-- [x] **Phase 3A — Cloud Log Collection**: CloudWatch Agent config/IAM policy/runbook prepared (`docs/aws/`) — apply on your own AWS account, not run from this repo's dev environment
-- [x] **Phase 3B — CloudWatch Log Collector**: polls CloudWatch Logs, normalizes into the [data contract](docs/data_contract.md), dedups via `source_event_id`, writes to PostgreSQL with `processed = false`
-- [x] Phase 4 — Incident Correlation Engine
-- [x] Phase 5 — Incident Timeline
-- [x] Phase 6 — Dashboard
-- [x] Phase 7 — Historical Knowledge Base
-- [x] Phase 8 — Explainable Gemini AI
-- [x] Phase 9 — Smart SNS Alerts
-- [x] Phase 10 — Engineer Feedback
+The simulator writes newline-delimited JSON logs to `logs/application.log`.
+The collector polls that file, stores valid rows in PostgreSQL, and marks them
+as unprocessed. The backend's correlation loop reads those database rows,
+creates incidents and timelines, and the frontend fetches all dashboard data
+through the backend API. The dashboard does **not** read the log file directly.
 
-## Phase 1 — Setup & Run
+In AWS mode, only the source portion changes:
 
-### What's included
-- FastAPI backend (`backend/`) with `GET /` and `GET /api/health`, SQLAlchemy models for all 5 tables (`logs`, `incidents`, `incident_timeline`, `knowledge_base`, `feedback`, auto-created on startup), CORS enabled for the frontend.
-- React + Vite + Tailwind frontend (`frontend/`) with a page that calls `/api/health` and shows a live backend/DB connection indicator.
-- `docker-compose.yml` wiring `postgres` → `backend` → `frontend`, with a Postgres healthcheck gating backend startup.
-- Pytest smoke tests (`tests/backend/test_health.py`).
+```text
+Application -> CloudWatch Agent -> CloudWatch Logs -> Collector -> PostgreSQL
+```
 
-### Option A — Docker (recommended)
-```bash
-cp .env.example .env
+Everything after collection continues to use the same stored-log format.
+
+## Technology
+
+| Area | Technology |
+| --- | --- |
+| Frontend | React, Vite, Tailwind CSS, Axios |
+| Backend API | Python, FastAPI, SQLAlchemy |
+| Database | PostgreSQL 16 |
+| Log sources | Local JSON log file or AWS CloudWatch Logs |
+| AI (optional) | Google Gemini |
+| Notifications (optional) | AWS SNS |
+| Local runtime | Docker and Docker Compose |
+
+## Prerequisites
+
+For the recommended Docker setup, install only:
+
+1. [Docker Desktop](https://www.docker.com/products/docker-desktop/), with Docker Compose enabled.
+2. Git, if you are cloning the repository rather than receiving the project folder.
+
+Before continuing, open Docker Desktop and wait until its engine is running.
+
+### Windows note
+
+Docker Desktop needs permission to mount the drive containing this repository.
+If Docker reports a bind-mount or file-sharing error, enable sharing for that
+drive in Docker Desktop settings, then restart Docker Desktop.
+
+## Run locally on any computer
+
+These instructions assume the project folder is already present on the other
+person's computer.
+
+### 1. Open a terminal in the project directory
+
+PowerShell example:
+
+```powershell
+cd "C:\path\to\Cloud-Based-Intelligent-Log-Aggregation-Incident-Analysis-Platform"
+```
+
+### 2. Create a local environment file
+
+```powershell
+Copy-Item .env.example .env
+```
+
+The default `.env.example` values are enough for the local demo. Do not commit
+the generated `.env` file; it is already ignored by Git and is the correct
+place for private API keys or AWS settings.
+
+### 3. Build and start the stack
+
+```powershell
 docker compose up --build
 ```
-- Frontend: http://localhost:5173
-- Backend + Swagger docs: http://localhost:8000/docs
-- Postgres: localhost:5432
 
-### Option B — Run locally without Docker
+The first run downloads base images and installs dependencies, so it can take a
+few minutes. Later starts are usually faster. Keep this terminal open while
+using the application.
 
-**Backend**
-```bash
+Docker starts these services:
+
+| Service | Purpose | Local address |
+| --- | --- | --- |
+| `frontend` | React dashboard | http://localhost:5173 |
+| `backend` | FastAPI API and correlation loop | http://localhost:8000 |
+| `postgres` | Persistent application database | `localhost:5432` |
+| `collector` | Reads local logs and inserts them into PostgreSQL | Internal service |
+
+### 4. Open and verify the application
+
+- Dashboard: http://localhost:5173
+- API health check: http://localhost:8000/api/health
+- Interactive API documentation: http://localhost:8000/docs
+
+The health endpoint should report `"status": "ok"`. A database connection is
+available after the PostgreSQL container passes its health check.
+
+## Demo workflow
+
+Use this workflow to show the complete application without AWS or paid cloud
+resources:
+
+1. Open the dashboard at http://localhost:5173.
+2. Open **Simulation** and choose `database_timeout`.
+3. Click **Start simulation**.
+4. Wait a few seconds for the collector to import the generated logs.
+5. On **Overview** or **Incidents**, click **Run correlation**. The backend also
+   runs correlation automatically every two seconds.
+6. Open the created incident to view its timeline and related database logs.
+7. Optionally request Gemini analysis if `GEMINI_API_KEY` is configured.
+8. Add engineer feedback, then resolve the incident. The final resolution is
+   stored in the knowledge base for later similarity retrieval.
+
+Available injected failures:
+
+- `database_timeout`
+- `redis_failure`
+- `payment_api_timeout`
+- `auth_failure`
+- `cpu_spike`
+- `disk_full`
+- `none` for a healthy workflow run
+
+## Configuration
+
+All configuration is read from `.env`. The important local variables already
+have working defaults in `.env.example`.
+
+| Variable | Default / local value | Purpose |
+| --- | --- | --- |
+| `DATABASE_URL` | PostgreSQL service URL | Backend database connection |
+| `COLLECTOR_DATABASE_URL` | PostgreSQL service URL | Collector database connection |
+| `LOG_SOURCE` | `local` | Selects the local-file or CloudWatch collector |
+| `LOCAL_LOG_FILE` | `/var/log/log-aggregator/application.log` | File read by the containerized collector |
+| `COLLECTOR_POLL_INTERVAL_SECONDS` | `2` | How often the collector checks for logs |
+| `CORRELATION_POLL_INTERVAL_SECONDS` | `2` | How often the backend checks unprocessed database logs |
+| `MAX_INCIDENT_GAP_SECONDS` | `900` | Splits widely separated logs into different incidents |
+| `GEMINI_API_KEY` | empty | Enables live Gemini analysis when supplied |
+| `SNS_TOPIC_ARN` | empty | Enables SNS alerts when supplied |
+
+### Optional Gemini analysis
+
+Set `GEMINI_API_KEY` in `.env`, then rebuild/restart the backend:
+
+```powershell
+docker compose up --build
+```
+
+Without a key, incident collection, correlation, timelines, feedback, and the
+knowledge base still work. The API reports that AI analysis is unavailable.
+
+### Optional AWS / CloudWatch mode
+
+AWS is not required for local use. To collect from CloudWatch instead, set:
+
+```text
+LOG_SOURCE=cloudwatch
+AWS_REGION=ap-south-1
+LOG_GROUP_NAME=/log-aggregator/application
+```
+
+The collector obtains AWS credentials from boto3's normal credential chain; do
+not put credentials into the repository. See [docs/aws/cloudwatch_agent_setup.md](docs/aws/cloudwatch_agent_setup.md) and the IAM policy under `docs/aws/`.
+
+## Useful commands
+
+Run these from the repository root.
+
+```powershell
+# Start in the background
+docker compose up --build -d
+
+# View container status
+docker compose ps
+
+# Follow all logs
+docker compose logs -f
+
+# Follow one service, for example the collector
+docker compose logs -f collector
+
+# Stop containers but preserve database data
+docker compose down
+
+# Stop containers and remove the local PostgreSQL volume (erases local data)
+docker compose down -v
+```
+
+Use `docker compose down -v` only when you intentionally want a fresh local
+database, for example after a schema experiment.
+
+## API overview
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/health` | Backend and database health |
+| `GET` | `/api/simulation/workflows` | Available workflows |
+| `GET` | `/api/simulation/failures` | Available failure scenarios |
+| `POST` | `/api/simulation/start` | Start a simulated run |
+| `POST` | `/api/simulation/stop` | Stop the active simulation |
+| `GET` | `/api/simulation/status` | Current simulation state |
+| `POST` | `/api/incidents/correlate` | Correlate unprocessed database logs now |
+| `GET` | `/api/incidents` | List incidents |
+| `GET` | `/api/incidents/{id}` | Incident details |
+| `GET` | `/api/incidents/{id}/timeline` | Incident timeline |
+| `GET` | `/api/incidents/{id}/logs` | Logs belonging to an incident |
+| `POST` | `/api/incidents/{id}/analysis` | Request Gemini analysis |
+| `POST` | `/api/incidents/{id}/feedback` | Save engineer feedback |
+| `POST` | `/api/incidents/{id}/resolve` | Resolve and store knowledge-base evidence |
+| `GET` | `/api/dashboard/summary` | Dashboard counters and recent incidents |
+| `GET` | `/api/knowledge-base` | Resolved-incident knowledge records |
+
+Full request/response documentation is available at http://localhost:8000/docs
+while the backend is running.
+
+## Testing
+
+The repository includes tests for health checks, simulations, collection,
+normalization, correlation, schema upgrades, timelines, Gemini persistence, and
+SNS alert idempotency.
+
+For a non-Docker Python test run:
+
+```powershell
 cd backend
 python -m venv .venv
-.venv\Scripts\activate        # Windows
+.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-uvicorn main:app --reload
+pip install pytest
+pytest ../tests/backend ../collector/tests -q
 ```
-Without a running Postgres, `/api/health` reports `"database": "disconnected"` — the API still starts, since the DB connection is only checked, not required at boot.
 
-**Frontend**
-```bash
+The frontend can be checked separately:
+
+```powershell
 cd frontend
 npm install
-npm run dev
+npm run build
 ```
 
-### Testing
-```bash
-cd backend
-pip install -r requirements.txt
-pytest ../tests/backend -v
+## Troubleshooting
+
+| Problem | Likely cause | What to do |
+| --- | --- | --- |
+| `port is already allocated` | Another application uses port 5432, 8000, or 5173 | Stop the conflicting application or change the matching port in `docker-compose.yml`. |
+| Frontend says backend is unavailable | Backend has not started or is unhealthy | Check `docker compose logs -f backend` and visit `/api/health`. |
+| Simulation completes but no incident appears | Collector has not imported logs yet | Check `docker compose logs -f collector`, wait a few seconds, then run correlation. |
+| Database schema errors after old local runs | Existing volume predates a schema change | Back up anything needed, then run `docker compose down -v` and start again. |
+| AI analysis unavailable | `GEMINI_API_KEY` is empty or invalid | Add a valid key to `.env`, then rebuild/restart containers. |
+| Docker bind-mount failure on Windows | Docker Desktop cannot access the project drive | Allow the drive in Docker Desktop settings and restart Docker Desktop. |
+
+## Project layout
+
+```text
+backend/                 FastAPI app, database models, APIs, services, simulation engine
+frontend/                React/Vite dashboard
+collector/               Local-file and CloudWatch collectors, normalization, deduplication
+docs/                    Data contract and AWS setup reference
+docs/aws/                CloudWatch Agent configuration and IAM policy
+tests/                   Backend test suite
+docker-compose.yml       Local multi-container runtime
+.env.example             Safe configuration template
 ```
 
-### Common errors
-| Symptom | Cause | Fix |
-|---|---|---|
-| `port is already allocated` | Something else is using 5432/8000/5173 | Stop the conflicting process, or remap the host port in `docker-compose.yml` |
-| Backend crashes immediately in Docker | Postgres not ready yet | Already handled via `depends_on: condition: service_healthy`; if it persists, check `docker compose logs postgres` |
-| Frontend shows "Backend Unreachable" | Backend not running, or CORS origin mismatch | Confirm backend is up at `:8000`; check `cors_origins` in `backend/app/config.py` |
-| `ModuleNotFoundError` running pytest | Wrong working directory / venv not activated | Run from `backend/` with the venv activated |
+The folders `correlation_engine/`, `incident_builder/`, `timeline_engine/`,
+`knowledge_base/`, `llm_engine/`, and `alert_service/` contain phase-level
+documentation. Their active implementation is consolidated under
+`backend/app/services/` and related backend modules.
 
-### Future improvements
-Alembic migrations (replacing `create_all()`), multi-stage production Docker builds, reverse proxy/HTTPS termination.
+## Data contract
 
-## Phase 2 — Log Generation
+`docs/data_contract.md` defines the canonical log shape used after collection.
+Any new log source should translate its events to that shape in the collector.
+Downstream code should read database log records rather than raw CloudWatch or
+simulator payloads.
 
-A demo log generator simulates realistic incidents instead of random noise, so the (future)
-correlation engine has logically-connected events to group. It writes newline-delimited JSON
-to `logs/application.log` — the exact file a CloudWatch Agent will tail unchanged in Phase 3.
-Nothing in this phase talks to AWS.
+## Security and repository hygiene
 
-### Concepts
-- **Workflow** (`backend/app/simulation/workflows/`): a baseline business flow. Currently just
-  `ecommerce` (login → browse → cart → checkout).
-- **Failure** (`backend/app/simulation/failures/`): an injectable tail appended after the
-  workflow completes — `database_timeout`, `redis_failure`, `payment_api_timeout`,
-  `auth_failure`, `cpu_spike`, `disk_full`, or `none` for a healthy run.
-- Every run shares one `trace_id` across all its logs; runs with a failure also get an
-  `incident_id`, so Phase 4's correlation engine can group by either.
-- Simulations run as a background asyncio task and write one log line at a time, paced in
-  real time (`speed: instant | fast | normal`), so `/api/simulation/status` and
-  `/api/simulation/stop` reflect an actually-running simulation instead of a completed no-op.
-
-### API
-| Method | Path | Description |
-|---|---|---|
-| GET | `/api/simulation/workflows` | List available workflows |
-| GET | `/api/simulation/failures` | List available failures (incl. `none`) |
-| POST | `/api/simulation/start` | Body: `{"workflow": "ecommerce", "failure": "database_timeout", "speed": "fast"}` |
-| POST | `/api/simulation/stop` | Cancel the running simulation |
-| GET | `/api/simulation/status` | Current simulation state, trace/incident id, last log emitted |
-
-```bash
-curl -X POST http://localhost:8000/api/simulation/start \
-  -H "Content-Type: application/json" \
-  -d '{"workflow": "ecommerce", "failure": "database_timeout", "speed": "fast"}'
-
-curl http://localhost:8000/api/simulation/status
-```
-
-## Phase 3 — Cloud Log Collection
-
-Split into two independent pieces so a broken CloudWatch integration can never take down
-log ingestion into PostgreSQL, and vice versa. Read [`docs/data_contract.md`](docs/data_contract.md)
-first — it's the schema every module below and every future phase (correlation, timeline,
-knowledge base, LLM) reads and writes.
-
-**Phase 3A — CloudWatch Agent** (`docs/aws/`): ship `logs/application.log` into CloudWatch
-Logs. No collector, no database writes — just confirm structured logs are visibly landing in
-CloudWatch. Requires an AWS account; follow `docs/aws/cloudwatch_agent_setup.md`.
-
-**Phase 3B — Collector** (`collector/`): an independent process that polls CloudWatch Logs,
-normalizes each event into the Stored Log Record shape, deduplicates by CloudWatch's
-`eventId`, and writes to the `logs` table with `processed = false`. See `collector/README.md`.
-
-> **Note:** the `logs` table gained new columns (`incident_id`, `workflow`, `failure_type`,
-> `source`, `source_event_id`, `processed`) in this phase. There's no Alembic yet
-> (tables are created via `create_all()`, which won't alter an existing table) — if you
-> already have a local Postgres volume from Phase 1/2, reset it: `docker compose down -v`
-> then `docker compose up --build`.
+- Keep `.env` private. It may contain Gemini keys, SNS ARNs, or environment-specific settings.
+- Never commit AWS access keys or database passwords.
+- Change the example PostgreSQL password before using this outside a local demo.
+- The local database is persisted in Docker's `postgres_data` volume until you remove it with `docker compose down -v`.
