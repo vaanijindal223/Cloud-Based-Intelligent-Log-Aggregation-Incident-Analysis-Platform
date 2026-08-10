@@ -9,7 +9,7 @@ CloudWatch Collector -> PostgreSQL -> Correlation`. Both then continue through `
 Timeline -> Historical Retrieval -> Explainable LLM -> SNS`.
 
 Required local variables are `DATABASE_URL`, `LOG_SOURCE=local`, and collector file settings.
-`OPENAI_API_KEY` is optional unless live AI analysis is being tested; `SNS_TOPIC_ARN` and AWS
+`GEMINI_API_KEY` is optional unless live AI analysis is being tested; `SNS_TOPIC_ARN` and AWS
 default credentials are optional unless live incident alerts are being tested. Set
 `LOG_SOURCE=cloudwatch`, `AWS_REGION`, and `LOG_GROUP_NAME` for the EC2/CloudWatch demo.
 
@@ -34,7 +34,7 @@ Built incrementally, one module/phase at a time. See progress below.
 - **Database:** PostgreSQL
 - **Processing:** deterministic in-process correlation (no queue required)
 - **Cloud:** AWS EC2, CloudWatch Logs, SNS, IAM, S3 (optional)
-- **AI:** optional OpenAI-ready provider configuration; deterministic fallback remains available
+- **AI:** optional Gemini API integration with deterministic fallback when no key is configured
 - **Containers:** Docker, Docker Compose
 
 ## Project structure
@@ -47,7 +47,7 @@ correlation_engine/       Groups logs into incidents           (Phase 4)
 incident_builder/          Persists incidents                    (Phase 4)
 timeline_engine/           Builds incident timelines              (Phase 5)
 knowledge_base/            Historical incident storage/retrieval  (Phase 7)
-llm_engine/                 Explainable AI (LangChain)              (Phase 8)
+llm_engine/                 Explainable Gemini AI                   (Phase 8)
 alert_service/               Smart SNS alerting                       (Phase 9)
 docker/                       Shared infra config
 docs/                          Design/reference docs
@@ -63,13 +63,13 @@ docker-compose.yml
 - [x] **Phase 2 — Log Generation**: scenario-based simulation engine (ecommerce workflow + 6 injectable failures), real-time paced background execution, REST control API
 - [x] **Phase 3A — Cloud Log Collection**: CloudWatch Agent config/IAM policy/runbook prepared (`docs/aws/`) — apply on your own AWS account, not run from this repo's dev environment
 - [x] **Phase 3B — CloudWatch Log Collector**: polls CloudWatch Logs, normalizes into the [data contract](docs/data_contract.md), dedups via `source_event_id`, writes to PostgreSQL with `processed = false`
-- [ ] Phase 4 — Incident Correlation Engine
-- [ ] Phase 5 — Incident Timeline
-- [ ] Phase 6 — Dashboard
-- [ ] Phase 7 — Historical Knowledge Base
-- [ ] Phase 8 — Explainable AI
-- [ ] Phase 9 — Smart Alerts
-- [ ] Phase 10 — Engineer Feedback
+- [x] Phase 4 — Incident Correlation Engine
+- [x] Phase 5 — Incident Timeline
+- [x] Phase 6 — Dashboard
+- [x] Phase 7 — Historical Knowledge Base
+- [x] Phase 8 — Explainable Gemini AI
+- [x] Phase 9 — Smart SNS Alerts
+- [x] Phase 10 — Engineer Feedback
 
 ## Phase 1 — Setup & Run
 

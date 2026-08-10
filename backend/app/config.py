@@ -20,9 +20,11 @@ class Settings(BaseSettings):
     correlation_poll_interval_seconds: float = 2.0
     max_incident_gap_seconds: int = 900
     rag_top_k: int = 5
-    openai_api_key: str | None = None
-    openai_model: str = "gpt-4o-mini"
-    openai_timeout_seconds: float = 20
+    # Gemini is optional. The deterministic incident pipeline keeps working
+    # without it, while the analysis endpoint reports that AI is unavailable.
+    gemini_api_key: str | None = None
+    gemini_model: str = "gemini-3.6-flash"
+    gemini_timeout_seconds: float = 60
     aws_region: str = "ap-south-1"
     sns_topic_arn: str | None = None
     alert_critical: bool = True
