@@ -43,13 +43,13 @@ logs_table = Table(
 engine = create_engine(settings.database_url, pool_pre_ping=True)
 
 
-def get_last_checkpoint() -> datetime | None:
+def get_last_checkpoint(source: str = "cloudwatch") -> datetime | None:
     """Latest timestamp already stored from CloudWatch. Deriving the checkpoint from
     the table itself (instead of a separate pointer) means a collector restart can't
     desync from what's actually been persisted."""
     with engine.connect() as conn:
         return conn.execute(
-            select(func.max(logs_table.c.timestamp)).where(logs_table.c.source == "cloudwatch")
+            select(func.max(logs_table.c.timestamp)).where(logs_table.c.source == source)
         ).scalar()
 
 

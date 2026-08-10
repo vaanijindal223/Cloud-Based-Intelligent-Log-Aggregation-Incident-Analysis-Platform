@@ -24,16 +24,36 @@ No separate checkpoint table — the checkpoint is derived from what's already i
 collector restart can't drift from what's actually been persisted. The overlap window plus
 `source_event_id` dedup means re-fetching the same event twice is harmless.
 
+## Local development
+
+Compose starts this service with `LOG_SOURCE=local` and mounts the same `./logs` directory as
+the backend. The development flow is:
+
+```
+Simulation -> logs/application.log -> local collector -> PostgreSQL -> correlation -> incident/timeline
+```
+
+The collector polls every two seconds. It safely rescans the file after a restart because the
+unique `source_event_id` constraint prevents previously inserted lines from being duplicated.
+
+## CloudWatch mode
+
+CloudWatch remains the production/demo cloud architecture. Set `LOG_SOURCE=cloudwatch` and
+configure the standard boto3 credentials, region, and log group:
+
+```
+Application -> CloudWatch Agent -> CloudWatch Logs -> CloudWatch collector -> PostgreSQL
+```
+
 ## Running it
 
 ```bash
-cd collector
-python -m venv .venv
-.venv\Scripts\activate        # Windows
-pip install -r requirements.txt
-cp ../.env.example .env        # set DATABASE_URL, AWS_REGION, LOG_GROUP_NAME
-python collector.py --once     # one poll cycle, for testing
-python collector.py            # continuous polling loop
+python -m venv collector\.venv
+collector\.venv\Scripts\activate        # Windows
+pip install -r collector\requirements.txt
+# Set DATABASE_URL and LOG_SOURCE in .env (use localhost as the host DB address).
+python -m collector.collector --once     # one poll cycle, for testing
+python -m collector.collector            # continuous polling loop
 ```
 
 AWS credentials come from boto3's default chain (env vars, `~/.aws/credentials`, or an EC2

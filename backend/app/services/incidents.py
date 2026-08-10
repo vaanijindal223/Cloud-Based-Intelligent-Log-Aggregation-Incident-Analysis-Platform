@@ -80,8 +80,16 @@ def similar(db, incident, limit=None):
 
 def resolve(db, incident, resolution, root_cause=None, notes=None):
     incident.status="RESOLVED"; incident.resolved_at=datetime.now(timezone.utc)
-    if root_cause: incident.root_cause=root_cause
+    feedback=db.get(Feedback, incident.incident_id)
+    # Verified engineer evidence is the canonical historical record when supplied.
+    verified_root_cause=(feedback.actual_root_cause if feedback and feedback.actual_root_cause else root_cause)
+    verified_resolution=(feedback.actual_resolution if feedback and feedback.actual_resolution else resolution)
+    if verified_root_cause: incident.root_cause=verified_root_cause
+    events=db.query(IncidentTimeline).filter_by(incident_id=incident.incident_id).order_by(IncidentTimeline.timestamp).all()
+    timeline_summary=" | ".join(f"{event.service}: {event.event}" for event in events[:20])
+    historical_summary=" ".join(filter(None, [incident.summary, f"failure_type: {next((x.failure_type for x in db.query(Log).join(IncidentLog, IncidentLog.log_id == Log.id).filter(IncidentLog.incident_id == incident.incident_id).all() if x.failure_type), '')}", f"affected_services: {incident.affected_services}", f"timeline: {timeline_summary}"]))
     kb=db.query(KnowledgeBase).filter_by(incident_id=incident.incident_id).first()
-    if not kb: kb=KnowledgeBase(incident_id=incident.incident_id, root_cause=incident.root_cause or "Not confirmed", resolution=resolution, engineer_notes=notes, summary=incident.summary); db.add(kb)
-    else: kb.root_cause=incident.root_cause or kb.root_cause; kb.resolution=resolution; kb.engineer_notes=notes; kb.summary=incident.summary
+    engineer_notes="\n".join(filter(None, [notes, feedback.engineer_comments if feedback else None]))
+    if not kb: kb=KnowledgeBase(incident_id=incident.incident_id, root_cause=incident.root_cause or "Not confirmed", resolution=verified_resolution, engineer_notes=engineer_notes or None, summary=historical_summary); db.add(kb)
+    else: kb.root_cause=incident.root_cause or kb.root_cause; kb.resolution=verified_resolution; kb.engineer_notes=engineer_notes or kb.engineer_notes; kb.summary=historical_summary
     db.commit(); db.refresh(incident); return incident
