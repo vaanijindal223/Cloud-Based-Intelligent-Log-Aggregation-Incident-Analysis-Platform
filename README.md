@@ -176,54 +176,8 @@ have working defaults in `.env.example`.
 
 ### Optional Gemini analysis
 
-Set `GEMINI_API_KEY` in `.env`, then rebuild/restart the backend:
-
-```powershell
-docker compose up --build
-```
-
 Without a key, incident collection, correlation, timelines, feedback, and the
 knowledge base still work. The API reports that AI analysis is unavailable.
-
-### Optional AWS / CloudWatch mode
-
-AWS is not required for local use. To collect from CloudWatch instead, set:
-
-```text
-LOG_SOURCE=cloudwatch
-AWS_REGION=ap-south-1
-LOG_GROUP_NAME=/log-aggregator/application
-```
-
-The collector obtains AWS credentials from boto3's normal credential chain; do
-not put credentials into the repository. See [docs/aws/cloudwatch_agent_setup.md](docs/aws/cloudwatch_agent_setup.md) and the IAM policy under `docs/aws/`.
-
-## Useful commands
-
-Run these from the repository root.
-
-```powershell
-# Start in the background
-docker compose up --build -d
-
-# View container status
-docker compose ps
-
-# Follow all logs
-docker compose logs -f
-
-# Follow one service, for example the collector
-docker compose logs -f collector
-
-# Stop containers but preserve database data
-docker compose down
-
-# Stop containers and remove the local PostgreSQL volume (erases local data)
-docker compose down -v
-```
-
-Use `docker compose down -v` only when you intentionally want a fresh local
-database, for example after a schema experiment.
 
 ## API overview
 
@@ -249,39 +203,14 @@ database, for example after a schema experiment.
 Full request/response documentation is available at http://localhost:8000/docs
 while the backend is running.
 
-## Testing
-
-The repository includes tests for health checks, simulations, collection,
-normalization, correlation, schema upgrades, timelines, Gemini persistence, and
-SNS alert idempotency.
-
-For a non-Docker Python test run:
-
-```powershell
-cd backend
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-pip install pytest
-pytest ../tests/backend ../collector/tests -q
-```
-
-The frontend can be checked separately:
-
-```powershell
-cd frontend
-npm install
-npm run build
-```
-
 ## Troubleshooting
 
 | Problem | Likely cause | What to do |
 | --- | --- | --- |
 | `port is already allocated` | Another application uses port 5432, 8000, or 5173 | Stop the conflicting application or change the matching port in `docker-compose.yml`. |
-| Frontend says backend is unavailable | Backend has not started or is unhealthy | Check `docker compose logs -f backend` and visit `/api/health`. |
-| Simulation completes but no incident appears | Collector has not imported logs yet | Check `docker compose logs -f collector`, wait a few seconds, then run correlation. |
-| Database schema errors after old local runs | Existing volume predates a schema change | Back up anything needed, then run `docker compose down -v` and start again. |
+| Frontend says backend is unavailable | Backend has not started or is unhealthy | Check the backend container logs in Docker Desktop and visit `/api/health`. |
+| Simulation completes but no incident appears | Collector has not imported logs yet | Check the collector container logs in Docker Desktop, wait a few seconds, then run correlation. |
+| Database schema errors after old local runs | Existing volume predates a schema change | Reset the local Docker database volume only if you intentionally want a fresh database. |
 | AI analysis unavailable | `GEMINI_API_KEY` is empty or invalid | Add a valid key to `.env`, then rebuild/restart containers. |
 | Docker bind-mount failure on Windows | Docker Desktop cannot access the project drive | Allow the drive in Docker Desktop settings and restart Docker Desktop. |
 
@@ -315,4 +244,4 @@ simulator payloads.
 - Keep `.env` private. It may contain Gemini keys, SNS ARNs, or environment-specific settings.
 - Never commit AWS access keys or database passwords.
 - Change the example PostgreSQL password before using this outside a local demo.
-- The local database is persisted in Docker's `postgres_data` volume until you remove it with `docker compose down -v`.
+- The local database is persisted in Docker's `postgres_data` volume until it is intentionally removed.
