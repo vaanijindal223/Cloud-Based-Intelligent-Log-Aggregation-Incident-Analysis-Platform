@@ -13,7 +13,7 @@ from sqlalchemy import Engine, inspect, text
 
 logger = logging.getLogger(__name__)
 
-INCIDENT_MIGRATION_REVISION = "20260810_add_current_incident_columns"
+SCHEMA_MIGRATION_REVISION = "20260810_add_current_incident_and_timeline_columns"
 
 
 def _incident_column_definitions(dialect: str) -> dict[str, str]:
@@ -37,6 +37,25 @@ def _incident_column_definitions(dialect: str) -> dict[str, str]:
         "created_at": f"{timestamp} NOT NULL DEFAULT {now_default}",
         "updated_at": f"{timestamp} NOT NULL DEFAULT {now_default}",
         "resolved_at": f"{timestamp}",
+    }
+
+
+def _timeline_column_definitions(dialect: str) -> dict[str, str]:
+    """Return every non-PK column required by IncidentTimeline.
+
+    ``log_id`` was added after the first timeline table was deployed. It is
+    intentionally nullable, so adding it cannot invalidate existing timeline
+    rows and allows old rows to remain useful historical evidence.
+    """
+    timestamp = "DATETIME" if dialect == "sqlite" else "TIMESTAMP WITH TIME ZONE"
+    return {
+        "incident_id": "INTEGER",
+        "timestamp": timestamp,
+        "service": "VARCHAR(100)",
+        "severity": "VARCHAR(20)",
+        "log_id": "INTEGER",
+        "event": "TEXT",
+        "evidence": "TEXT",
     }
 
 
@@ -76,6 +95,23 @@ def upgrade_database(engine: Engine) -> list[str]:
                 f"CREATE INDEX IF NOT EXISTS {index_name} ON incidents ({column_name})"
             ))
 
+        # Older volumes can have the initial timeline shape but not newer
+        # additive fields (in particular log_id). Keep all additions nullable
+        # so existing timeline rows are preserved exactly.
+        if inspect(connection).has_table("incident_timeline"):
+            existing_timeline_columns = {
+                column["name"] for column in inspect(connection).get_columns("incident_timeline")
+            }
+            for name, definition in _timeline_column_definitions(connection.dialect.name).items():
+                if name not in existing_timeline_columns:
+                    connection.execute(text(
+                        f"ALTER TABLE incident_timeline ADD COLUMN {name} {definition}"
+                    ))
+            connection.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_incident_timeline_incident_id "
+                "ON incident_timeline (incident_id)"
+            ))
+
         connection.execute(text("""
             CREATE TABLE IF NOT EXISTS schema_migrations (
                 revision VARCHAR(100) PRIMARY KEY,
@@ -88,7 +124,7 @@ def upgrade_database(engine: Engine) -> list[str]:
                 VALUES (:revision, CURRENT_TIMESTAMP)
                 ON CONFLICT (revision) DO NOTHING
             """),
-            {"revision": INCIDENT_MIGRATION_REVISION},
+            {"revision": SCHEMA_MIGRATION_REVISION},
         )
 
     if added:

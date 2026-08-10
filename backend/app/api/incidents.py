@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.database.session import get_db
 from app.models import Feedback, Incident, IncidentLog, IncidentTimeline, KnowledgeBase, Log
-from app.services.incidents import build_timeline, correlate, resolve, serialize, similar
+from app.services.incidents import build_timeline, process_pending_incidents, resolve, serialize, similar
 from app.services.analysis import analyze, get_analysis
 from app.services.alerts import send_initial_alert
 
@@ -28,9 +28,7 @@ def get_incident(db, iid):
 
 @router.post("/correlate")
 def run_correlation(db: Session=Depends(get_db)):
-    created = correlate(db)
-    for incident in created:
-        send_initial_alert(db, incident)
+    created = process_pending_incidents(db)
     return {"created": [serialize(x) for x in created]}
 
 @router.get("")
