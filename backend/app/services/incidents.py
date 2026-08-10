@@ -30,7 +30,7 @@ def correlate(db: Session):
             continue
         key = ("incident", log.incident_id) if log.incident_id else (("trace", log.trace_id) if log.trace_id else ("signal", log.service, log.workflow, log.failure_type))
         grouped.setdefault(key, []).append(log)
-    made = []
+    touched = []
     for key, group in grouped.items():
         # Prevent an unrelated, long-running signal from forming a single incident.
         chunks, current = [], []
@@ -43,14 +43,43 @@ def correlate(db: Session):
             first, last = chunk[0], chunk[-1]
             services = sorted({x.service for x in chunk})
             issue = next((x.failure_type for x in chunk if x.failure_type), None) or first.message
-            incident = Incident(severity=severity(chunk), status="ACTIVE", summary=f"{issue} affecting {', '.join(services)}", start_time=first.timestamp, end_time=last.timestamp, affected_services=json.dumps(services))
-            db.add(incident); db.flush()
+            key_type = key[0]
+            existing = None
+            if key_type in ("incident", "trace"):
+                key_value = key[1]
+                existing = db.query(Incident).join(IncidentLog).join(Log).filter(
+                    (Log.incident_id == key_value) if key_type == "incident" else (Log.trace_id == key_value)
+                ).first()
+            if existing:
+                incident = existing
+            else:
+                incident = Incident(severity=severity(chunk), status="ACTIVE", summary=f"{issue} affecting {', '.join(services)}", start_time=first.timestamp, end_time=last.timestamp, affected_services=json.dumps(services))
+                db.add(incident); db.flush()
             for log in chunk:
-                db.add(IncidentLog(incident_id=incident.incident_id, log_id=log.id)); log.processed = True
-            build_timeline(db, incident, chunk)
-            made.append(incident)
+                if not db.query(IncidentLog).filter_by(incident_id=incident.incident_id, log_id=log.id).first():
+                    db.add(IncidentLog(incident_id=incident.incident_id, log_id=log.id))
+                log.processed = True
+            db.flush()
+            all_logs = db.query(Log).join(IncidentLog, IncidentLog.log_id == Log.id).filter(IncidentLog.incident_id == incident.incident_id).all()
+            incident.severity = severity(all_logs)
+            incident.start_time = min(x.timestamp for x in all_logs)
+            incident.end_time = max(x.timestamp for x in all_logs)
+            incident.affected_services = json.dumps(sorted({x.service for x in all_logs}))
+            build_timeline(db, incident, all_logs)
+            touched.append(incident)
     db.commit()
-    return made
+    return touched
+
+
+def process_pending_incidents(db: Session):
+    """Run the existing correlation/incident-builder path and alert new rows."""
+    # Import lazily because alerts.py uses serialize() from this module.
+    from app.services.alerts import send_initial_alert
+
+    created = correlate(db)
+    for incident in created:
+        send_initial_alert(db, incident)
+    return created
 
 
 def build_timeline(db, incident, logs=None):
