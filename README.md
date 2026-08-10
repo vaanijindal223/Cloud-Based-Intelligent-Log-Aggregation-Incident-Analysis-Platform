@@ -1,7 +1,7 @@
 # Cloud-Based Intelligent Log Aggregation & Incident Analysis Platform
 
 An incident-intelligence platform that turns structured application logs into
-correlated incidents, timelines, optional AI analysis, alerts, and reusable
+correlated incidents, timelines, AI analysis, alerts, and reusable
 engineering knowledge. It is designed to sit on top of a log source; it is not
 a replacement for CloudWatch, ELK, or Splunk.
 
@@ -17,7 +17,7 @@ Docker starts the backend, frontend, collector, and database in containers.
 - Correlates related warning/error logs into incidents and assigns severity.
 - Creates a chronological incident timeline and exposes it on the dashboard.
 - Stores resolved incidents and engineer feedback as searchable historical knowledge.
-- Optionally requests evidence-based Gemini analysis and sends consolidated SNS alerts.
+- Provides evidence-based Gemini analysis and sends consolidated SNS alerts.
 
 ## Local architecture
 
@@ -61,8 +61,8 @@ Everything after collection continues to use the same stored-log format.
 | Backend API | Python, FastAPI, SQLAlchemy |
 | Database | PostgreSQL 16 |
 | Log sources | Local JSON log file or AWS CloudWatch Logs |
-| AI (optional) | Google Gemini |
-| Notifications (optional) | AWS SNS |
+| AI | Google Gemini |
+| Notifications | AWS SNS |
 | Local runtime | Docker and Docker Compose |
 
 ## Prerequisites
@@ -143,7 +143,7 @@ resources:
 5. On **Overview** or **Incidents**, click **Run correlation**. The backend also
    runs correlation automatically every two seconds.
 6. Open the created incident to view its timeline and related database logs.
-7. Optionally request Gemini analysis if `GEMINI_API_KEY` is configured.
+7. Request Gemini analysis to view the AI-generated incident explanation.
 8. Add engineer feedback, then resolve the incident. The final resolution is
    stored in the knowledge base for later similarity retrieval.
 
@@ -180,19 +180,24 @@ have working defaults in `.env.example`.
 | `COLLECTOR_POLL_INTERVAL_SECONDS` | `2` | How often the collector checks for logs |
 | `CORRELATION_POLL_INTERVAL_SECONDS` | `2` | How often the backend checks unprocessed database logs |
 | `MAX_INCIDENT_GAP_SECONDS` | `900` | Splits widely separated logs into different incidents |
-| `GEMINI_API_KEY` | empty | Enables live Gemini analysis when supplied |
+| `GEMINI_API_KEY` | Configure in `.env` | Gemini analysis integration |
 | `SNS_TOPIC_ARN` | empty | Enables SNS alerts when supplied |
 
-### Optional Gemini analysis
+### Gemini AI analysis
 
-Without a key, incident collection, correlation, timelines, feedback, and the
-knowledge base still work. The API reports that AI analysis is unavailable.
+Gemini analysis is integrated into the incident workflow. After an incident is
+created, the dashboard can request an evidence-based analysis that provides a
+summary, probable root cause, confidence, suggested resolution, alternatives,
+and related historical incidents. Configure `GEMINI_API_KEY` in `.env` for the
+Gemini integration.
 
-## AWS integration evidence (optional)
+## AWS integration evidence
 
-AWS is not required for the localhost demo. The following screenshots document
-the optional CloudWatch and SNS setup used to validate the cloud integration.
-Setup reference files are in `docs/aws/`.
+The following screenshots document the real AWS CloudWatch and SNS integration
+used in this project. They demonstrate that structured application logs reached
+CloudWatch and that SNS notifications were configured successfully. The project
+can still be run locally with Docker; EC2 hosting is not required for the local
+demo. Setup reference files are in `docs/aws/`.
 
 ### IAM role policies
 
@@ -254,7 +259,6 @@ while the backend is running.
 | Frontend says backend is unavailable | Backend has not started or is unhealthy | Check the backend container logs in Docker Desktop and visit `/api/health`. |
 | Simulation completes but no incident appears | Collector has not imported logs yet | Check the collector container logs in Docker Desktop, wait a few seconds, then run correlation. |
 | Database schema errors after old local runs | Existing volume predates a schema change | Reset the local Docker database volume only if you intentionally want a fresh database. |
-| AI analysis unavailable | `GEMINI_API_KEY` is empty or invalid | Add a valid key to `.env`, then rebuild/restart containers. |
 | Docker bind-mount failure on Windows | Docker Desktop cannot access the project drive | Allow the drive in Docker Desktop settings and restart Docker Desktop. |
 
 ## Project layout
