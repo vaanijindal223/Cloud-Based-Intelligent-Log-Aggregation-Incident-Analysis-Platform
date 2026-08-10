@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database.session import get_db
 from app.models import Feedback, Incident, IncidentLog, IncidentTimeline, KnowledgeBase, Log
 from app.services.incidents import build_timeline, process_pending_incidents, resolve, serialize, similar
@@ -25,6 +26,12 @@ def get_incident(db, iid):
     obj=db.get(Incident, iid)
     if not obj: raise HTTPException(404, "Incident not found")
     return obj
+
+
+def analysis_unavailable_message() -> str:
+    if not settings.gemini_api_key:
+        return "Gemini is not configured. Add GEMINI_API_KEY to .env and rebuild the backend container."
+    return "Gemini analysis request failed. Check the backend container logs for the provider error."
 
 @router.post("/correlate")
 def run_correlation(db: Session=Depends(get_db)):
@@ -61,9 +68,9 @@ def get_similar(incident_id:int, db:Session=Depends(get_db)): return similar(db,
 @router.get("/{incident_id}/analysis")
 def analysis(incident_id:int, db:Session=Depends(get_db)):
     x=get_incident(db,incident_id); result=get_analysis(db,x)
-    return {"status":"available", **result} if result else {"status":"unavailable", "message":"AI analysis unavailable", "historical_matches":similar(db,x)}
+    return {"status":"available", **result} if result else {"status":"unavailable", "message":analysis_unavailable_message(), "historical_matches":similar(db,x)}
 @router.post("/{incident_id}/analysis")
 def create_analysis(incident_id:int, db:Session=Depends(get_db)):
     x=get_incident(db,incident_id); result=analyze(db,x)
     if result: send_initial_alert(db,x,result); return {"status":"available", **result}
-    return {"status":"unavailable", "message":"AI analysis unavailable", "historical_matches":similar(db,x)}
+    return {"status":"unavailable", "message":analysis_unavailable_message(), "historical_matches":similar(db,x)}
