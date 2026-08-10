@@ -279,12 +279,6 @@ The folders `correlation_engine/`, `incident_builder/`, `timeline_engine/`,
 documentation. Their active implementation is consolidated under
 `backend/app/services/` and related backend modules.
 
-## Data contract
-
-`docs/data_contract.md` defines the canonical log shape used after collection.
-Any new log source should translate its events to that shape in the collector.
-Downstream code should read database log records rather than raw CloudWatch or
-simulator payloads.
 
 ## Security and repository hygiene
 
