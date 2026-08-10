@@ -58,5 +58,22 @@ services:
     depends_on:
       - backend
 
+  collector:
+    build: ./collector
+    container_name: log_platform_collector
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${COLLECTOR_DATABASE_URL:-postgresql://loguser:logpass123@postgres:5432/logaggregator}
+      LOG_SOURCE: ${LOG_SOURCE:-local}
+      LOCAL_LOG_FILE: /var/log/log-aggregator/application.log
+      POLL_INTERVAL_SECONDS: ${COLLECTOR_POLL_INTERVAL_SECONDS:-2}
+      AWS_REGION: ${AWS_REGION:-ap-south-1}
+      LOG_GROUP_NAME: ${LOG_GROUP_NAME:-/log-aggregator/application}
+    volumes:
+      - ./logs:/var/log/log-aggregator:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   postgres_data:

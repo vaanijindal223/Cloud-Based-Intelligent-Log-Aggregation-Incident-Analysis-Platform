@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from collector.cloudwatch_client import fetch_events
 from collector.config import settings
 from collector.db import get_last_checkpoint, insert_logs
+from collector.local_file_client import fetch_events as fetch_local_events
 from collector.normalizer import normalize_event
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -13,20 +14,28 @@ logger = logging.getLogger(__name__)
 
 
 def run_once() -> int:
-    checkpoint = get_last_checkpoint()
-    if checkpoint is None:
-        start_time = datetime.now(timezone.utc) - timedelta(seconds=settings.initial_lookback_seconds)
+    source = settings.log_source.lower()
+    if source == "local":
+        raw_events = fetch_local_events()
+        rows = [row for row in (normalize_event(e, source="local") for e in raw_events) if row is not None]
+        checkpoint = None
+    elif source == "cloudwatch":
+        checkpoint = get_last_checkpoint("cloudwatch")
+        if checkpoint is None:
+            start_time = datetime.now(timezone.utc) - timedelta(seconds=settings.initial_lookback_seconds)
+        else:
+            start_time = checkpoint - timedelta(seconds=settings.overlap_seconds)
+        raw_events = fetch_events(start_time=start_time)
+        rows = [row for row in (normalize_event(e, source="cloudwatch") for e in raw_events) if row is not None]
     else:
-        start_time = checkpoint - timedelta(seconds=settings.overlap_seconds)
-
-    raw_events = fetch_events(start_time=start_time)
-    rows = [row for row in (normalize_event(e) for e in raw_events) if row is not None]
+        raise ValueError("LOG_SOURCE must be either 'local' or 'cloudwatch'")
     inserted = insert_logs(rows)
     logger.info(
-        "Fetched %d events, inserted %d new rows (checkpoint=%s)",
+        "Fetched %d %s events, inserted %d new rows (checkpoint=%s)",
         len(raw_events),
+        source,
         inserted,
-        start_time.isoformat(),
+        checkpoint.isoformat() if checkpoint else "n/a",
     )
     return inserted
 

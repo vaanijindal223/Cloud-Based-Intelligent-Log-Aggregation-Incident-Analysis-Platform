@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     rag_top_k: int = 5
     openai_api_key: str | None = None
     openai_model: str = "gpt-4o-mini"
+    openai_timeout_seconds: float = 20
     aws_region: str = "ap-south-1"
     sns_topic_arn: str | None = None
     alert_critical: bool = True

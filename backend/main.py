@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api import health, simulation, incidents, dashboard, knowledge_base
 from app.config import settings
 from app.database.session import Base, engine
-from app.models import Feedback, Incident, IncidentTimeline, KnowledgeBase, Log  # noqa: F401
+from app.models import Feedback, Incident, IncidentTimeline, KnowledgeBase, Log, IncidentAnalysis, IncidentAlert  # noqa: F401
 
 logger = logging.getLogger(__name__)
 

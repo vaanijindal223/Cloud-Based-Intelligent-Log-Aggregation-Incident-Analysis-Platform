@@ -1,5 +1,13 @@
 # Data Contract
 
+## Source modes
+
+The stored record contract is source-independent. Local development uses
+`application.log -> local collector -> PostgreSQL`; cloud deployment uses `Application ->
+CloudWatch Agent -> CloudWatch Logs -> collector -> PostgreSQL`. The local adapter assigns a
+stable hash-based `source_event_id`; the CloudWatch adapter preserves CloudWatch's `eventId`.
+In both cases downstream correlation and timeline code only sees the Stored Log Record.
+
 The canonical shape of a log event as it moves through the pipeline:
 
 ```

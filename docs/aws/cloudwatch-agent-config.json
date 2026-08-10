@@ -8,7 +8,7 @@
       "files": {
         "collect_list": [
           {
-            "file_path": "/home/ec2-user/log-aggregator/logs/application.log",
+            "file_path": "/home/ubuntu/Cloud-Based-Intelligent-Log-Aggregation-Incident-Analysis-Platform/logs/application.log",
             "log_group_name": "/log-aggregator/application",
             "log_stream_name": "{hostname}",
             "retention_in_days": 14

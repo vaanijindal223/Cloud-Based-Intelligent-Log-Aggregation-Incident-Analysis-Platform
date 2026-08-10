@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 from app.database.session import get_db
 from app.models import Feedback, Incident, IncidentLog, IncidentTimeline, KnowledgeBase, Log
 from app.services.incidents import build_timeline, correlate, resolve, serialize, similar
+from app.services.analysis import analyze, get_analysis
+from app.services.alerts import send_initial_alert
 
 router=APIRouter(prefix="/incidents")
 
@@ -26,7 +28,10 @@ def get_incident(db, iid):
 
 @router.post("/correlate")
 def run_correlation(db: Session=Depends(get_db)):
-    return {"created": [serialize(x) for x in correlate(db)]}
+    created = correlate(db)
+    for incident in created:
+        send_initial_alert(db, incident)
+    return {"created": [serialize(x) for x in created]}
 
 @router.get("")
 def list_incidents(status: str|None=None, severity: str|None=None, search: str|None=None, db: Session=Depends(get_db)):
@@ -57,4 +62,10 @@ def feedback(incident_id:int, body:FeedbackRequest, db:Session=Depends(get_db)):
 def get_similar(incident_id:int, db:Session=Depends(get_db)): return similar(db,get_incident(db,incident_id))
 @router.get("/{incident_id}/analysis")
 def analysis(incident_id:int, db:Session=Depends(get_db)):
-    x=get_incident(db,incident_id); return {"status":"deterministic", "summary":x.summary, "probable_root_cause":x.root_cause or "Insufficient verified evidence", "evidence":["Observed timeline events"], "confidence":x.confidence or 0.35, "affected_services":serialize(x)["affected_services"], "suggested_resolution":"Acknowledge, inspect the timeline, then record the verified resolution.", "alternative_causes":[], "historical_matches":similar(db,x)}
+    x=get_incident(db,incident_id); result=get_analysis(db,x)
+    return {"status":"available", **result} if result else {"status":"unavailable", "message":"AI analysis unavailable", "historical_matches":similar(db,x)}
+@router.post("/{incident_id}/analysis")
+def create_analysis(incident_id:int, db:Session=Depends(get_db)):
+    x=get_incident(db,incident_id); result=analyze(db,x)
+    if result: send_initial_alert(db,x,result); return {"status":"available", **result}
+    return {"status":"unavailable", "message":"AI analysis unavailable", "historical_matches":similar(db,x)}

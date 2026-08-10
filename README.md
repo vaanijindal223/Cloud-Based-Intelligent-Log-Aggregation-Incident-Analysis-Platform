@@ -1,5 +1,24 @@
 # Cloud-Based Log Aggregation & Alerting System
 
+## Final architecture and demo
+
+This project is an incident-intelligence layer, not a replacement for CloudWatch. In local
+development the path is `Simulation -> application.log -> Local Collector -> PostgreSQL ->
+Correlation`. In AWS it is `EC2 application -> CloudWatch Agent -> CloudWatch Logs ->
+CloudWatch Collector -> PostgreSQL -> Correlation`. Both then continue through `Incident ->
+Timeline -> Historical Retrieval -> Explainable LLM -> SNS`.
+
+Required local variables are `DATABASE_URL`, `LOG_SOURCE=local`, and collector file settings.
+`OPENAI_API_KEY` is optional unless live AI analysis is being tested; `SNS_TOPIC_ARN` and AWS
+default credentials are optional unless live incident alerts are being tested. Set
+`LOG_SOURCE=cloudwatch`, `AWS_REGION`, and `LOG_GROUP_NAME` for the EC2/CloudWatch demo.
+
+For a local demo, run `docker compose up --build`, start a `database_timeout` simulation, wait
+for collection, run correlation, open the incident, request AI analysis (when configured), then
+save feedback and resolve it. AWS validation additionally requires an EC2 instance, CloudWatch
+Agent configuration from `docs/aws/`, a collector identity with CloudWatch read access, and an
+SNS topic/publish permission.
+
 An intelligent monitoring platform that sits on top of cloud log aggregation and turns thousands of raw logs into a handful of meaningful, explained incidents — instead of another CloudWatch/ELK/Splunk clone.
 
 ```
