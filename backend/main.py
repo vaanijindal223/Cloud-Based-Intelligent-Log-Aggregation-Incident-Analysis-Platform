@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import health, simulation, incidents, dashboard, knowledge_base
 from app.config import settings
+from app.database.migrations import upgrade_database
 from app.database.session import Base, engine
 from app.models import Feedback, Incident, IncidentTimeline, KnowledgeBase, Log, IncidentAnalysis, IncidentAlert  # noqa: F401
 
@@ -16,6 +17,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     try:
         Base.metadata.create_all(bind=engine)
+        upgrade_database(engine)
     except Exception:
         logger.warning("Database unavailable at startup; tables were not created.", exc_info=True)
     yield
